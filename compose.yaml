@@ -29,6 +29,8 @@ services:
       - "127.0.0.1:5433:5432"
     volumes:
       - kloudkart_test_data:/var/lib/postgresql
+      - ./database/init/01_initialize_test.sh:/docker-entrypoint-initdb.d/01_initialize_test.sh:ro
+      - ./provided_resources:/provided_resources:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${TEST_DB_USER} -d ${TEST_DB_NAME}"]
       interval: 10s
