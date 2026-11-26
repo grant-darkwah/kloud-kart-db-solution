@@ -3,6 +3,7 @@ services:
     image: postgres:18
     container_name: kloudkart-prod
     restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=500"]
     environment:
       POSTGRES_DB: ${PROD_DB_NAME}
       POSTGRES_USER: ${PROD_DB_USER}
@@ -21,6 +22,7 @@ services:
     image: postgres:18
     container_name: kloudkart-test
     restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=500"]
     environment:
       POSTGRES_DB: ${TEST_DB_NAME}
       POSTGRES_USER: ${TEST_DB_USER}
