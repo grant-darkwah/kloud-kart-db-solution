@@ -1,0 +1,38 @@
+# ADR-001: Use atomic stock deduction for order placement
+
+- **Status:** Accepted
+- **Date:** 2026-11-27
+- **Decision owner:** Grant Sarfo Darkwah
+
+## Context
+
+Kloud Kart processes approximately 4,000 orders daily. Two customers may attempt to purchase the last available unit at nearly the same time.
+
+A conventional application workflow that reads the available stock and subsequently updates it can allow both transactions to observe the same available quantity before either transaction completes.
+
+This creates an overselling risk.
+
+## Decision
+
+Implement order placement through a PostgreSQL function named `place_order` that performs a conditional stock deduction and order creation within a transaction.
+
+The stock deduction succeeds only when sufficient inventory remains available.
+
+## Alternatives considered
+
+### Alternative A: Application-level stock checking
+
+- **How it would work:** The application reads the current stock quantity, checks whether sufficient units exist, and then submits an update and creates the order.
+- **Why it is attractive:** It is straightforward to implement and keeps business logic in the application.
+- **Why rejected:** Separate stock-reading and stock-updating operations can race under concurrent purchases, allowing multiple customers to claim the same available units.
+
+## Consequences
+
+- **What this buys:** Inventory protection at the database transaction boundary. In testing, 25 out of 25 last-unit competition rounds produced exactly one successful buyer.
+- **What this costs:** Applications must use the implemented order-placement function rather than independently checking and deducting stock.
+- **What it costs the client if I am wrong:** Kloud Kart could still experience overselling if another application or process changes inventory outside the protected operation.
+- **What would make me revisit this:** Introducing additional sales channels, inventory reservation workflows or other stock-changing applications that do not use the same transaction-controlled operation.
+
+## What this survives
+
+The implementation was tested with two buyers competing for one unit across 25 rounds. It also passed a flash-sale test involving 400 competing buyers and 50 available units: exactly 50 purchases succeeded, 350 were refused, and zero errors were recorded.

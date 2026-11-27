@@ -1,0 +1,53 @@
+# ADR-003: Use a recursive CTE for category-level stock reporting
+
+- **Status:** Accepted
+- **Date:** 2026-11-27
+- **Decision owner:** Grant Sarfo Darkwah
+
+## Context
+
+Kloud Kart needs to identify low-stock products across its category hierarchy. The hierarchy may grow as new categories and subcategories are added.
+
+A fixed-depth query would require changes whenever the category structure becomes deeper. The existing data also contains hierarchy problems, including a category cycle and an orphan category.
+
+The report must account for these conditions rather than silently excluding affected products.
+
+## Decision
+
+Use a recursive Common Table Expression (CTE) to traverse the category hierarchy dynamically and roll up low-stock products and quantities.
+
+Classify inventory as follows:
+
+- **Low stock:** 1–10 units.
+- **Out of stock:** 0 units.
+- **Negative stock:** An inventory anomaly.
+- **Adequately stocked:** More than 10 units.
+
+Report products associated with category cycles and unassigned or orphaned categories separately so that the totals can be reconciled.
+
+## Alternatives considered
+
+### Alternative A: Fixed-depth joins
+
+- **How it would work:** Use a predetermined number of joins to retrieve parent and child categories.
+- **Why it is attractive:** The query is straightforward for a hierarchy with a known, limited depth.
+- **Why rejected:** It does not adapt naturally when the category hierarchy grows beyond the predefined depth.
+
+### Alternative B: Application-level hierarchy traversal
+
+- **How it would work:** Retrieve category records and traverse the hierarchy in application code.
+- **Why it is attractive:** It provides flexibility for custom hierarchy-processing logic.
+- **Why rejected:** The reporting logic would be split between the application and database, making aggregation and reconciliation less direct.
+
+## Consequences
+
+- **What this buys:** Category-level stock reporting that adapts to changing hierarchy depth without requiring additional joins for every new level.
+- **What this costs:** Recursive queries require careful handling of cycles, orphan categories and unassigned products. The reporting logic is also more complex than a simple aggregation.
+- **What it costs the client if I am wrong:** Products could be omitted or counted incorrectly in category-level stock reports, potentially leading to poor replenishment decisions.
+- **What would make me revisit this:** Significant changes to the category model, hierarchy size or reporting workload that make the current recursive approach inefficient or unsuitable.
+
+## What this survives
+
+The implementation was tested against the existing category data, including the identified cycle and orphan category.
+
+The report classified 1,358 products as low stock, representing 5,034 units. The category rollup reconciled these totals across the root categories, cycle-related products and unassigned products.

@@ -1,0 +1,50 @@
+# ADR-006: Apply performance optimizations based on measured evidence
+
+- **Status:** Accepted
+- **Date:** 2026-11-27
+- **Decision owner:** Grant Sarfo Darkwah
+
+## Context
+
+Kloud Kart needs its Monday customer spending report to run quickly and consistently as order data grows.
+
+Performance changes should address measured bottlenecks rather than introduce indexes or configuration changes based on assumptions.
+
+The project measured report execution and category rollup performance using the test database.
+
+## Decision
+
+Use measured query performance and execution plans to guide optimization.
+
+Apply expression statistics to improve the planner's estimates for normalized order-status expressions. Use a session-level `work_mem` setting of 32 MB during the reporting workload.
+
+Do not add an index unless the available performance evidence demonstrates a clear benefit.
+
+## Alternatives considered
+
+### Alternative A: Add indexes based on assumptions
+
+- **How it would work:** Create additional indexes on columns used by the reporting queries without first establishing whether they are the bottleneck.
+- **Why it is attractive:** Indexes can reduce the amount of data PostgreSQL needs to scan for certain queries.
+- **Why rejected:** Unnecessary indexes consume storage and add overhead to inserts, updates and deletes. The measurements did not establish a sufficient reason to add one.
+
+### Alternative B: Increase memory settings globally
+
+- **How it would work:** Increase PostgreSQL's `work_mem` configuration for all database sessions.
+- **Why it is attractive:** More memory may help operations such as sorting and hashing.
+- **Why rejected:** A global increase could multiply memory consumption across concurrent operations and sessions. A session-level setting limits the change to the reporting workload.
+
+## Consequences
+
+- **What this buys:** Performance improvements guided by actual measurements, without introducing indexes that have not demonstrated value. The category rollup completed in approximately 3.265 ms under the measured warm-cache test, while the full report averaged approximately 17.084 ms.
+- **What this costs:** Performance measurements depend on the test environment, data distribution and cache state. Session-level configuration must also be applied to reporting sessions that need it.
+- **What it costs the client if I am wrong:** The report could become slower as data volume or workload concurrency increases, potentially affecting the time available for Monday reporting.
+- **What would make me revisit this:** Increased execution times, changed query plans, growing data volume or evidence that a specific index would materially improve performance without unacceptable write overhead.
+
+## What this survives
+
+The reporting queries and category rollup were measured against the project's test dataset. The measured category rollup returned 96 rows, with a warm-cache execution time of approximately 3.265 ms. The full report averaged approximately 17.084 ms.
+
+No additional index was introduced because the available measurements did not justify one.
+
+These results describe the tested environment and should not be treated as guaranteed production response times.

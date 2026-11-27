@@ -1,0 +1,58 @@
+# ADR-004: Use database triggers to maintain the inventory audit trail
+
+- **Status:** Accepted
+- **Date:** 2026-11-27
+- **Decision owner:** Grant Sarfo Darkwah
+
+## Context
+
+Kloud Kart needs an audit trail for inventory movements so that stock changes can be investigated and reviewed.
+
+Recording movements only in application code creates a risk: another application or database operation could update product stock without recording the corresponding audit entry.
+
+The existing inventory log also has limitations. Historical records do not contain enough information to establish complete before-and-after stock values or reliably identify the human responsible for every historical movement.
+
+## Decision
+
+Use PostgreSQL triggers to automatically record inventory changes when `products.stock_quantity` is updated.
+
+The audit records capture:
+
+- Quantity before the update.
+- Quantity after the update.
+- Database session user.
+- Reference type and reference ID where supplied.
+- Movement timestamp.
+
+Protect the inventory log against ordinary updates and deletes using an append-only trigger.
+
+Update `place_order()` to provide audit context for order-related stock changes.
+
+## Alternatives considered
+
+### Alternative A: Application-managed audit logging
+
+- **How it would work:** Each application operation that changes stock also inserts a corresponding inventory log record.
+- **Why it is attractive:** The application can provide business context, including the user and reason for the movement.
+- **Why rejected:** Every stock-changing application must implement the audit logic correctly. A separate process could update stock without recording a movement.
+
+### Alternative B: Require every stock update to use a dedicated database function
+
+- **How it would work:** Applications would be required to call a database function for every stock adjustment, with the function responsible for recording the audit entry.
+- **Why it is attractive:** It centralizes stock-changing operations and audit logic.
+- **Why rejected:** It provides less automatic coverage for direct stock updates than a trigger-based approach.
+
+## Consequences
+
+- **What this buys:** Stock updates are automatically recorded at the database level, reducing dependence on individual applications remembering to write audit entries.
+- **What this costs:** Triggers add database-side logic that must be maintained and tested. The recorded session user identifies the database role, not necessarily the human who initiated the operation.
+- **What it costs the client if I am wrong:** Inventory changes could be incorrectly attributed, or audit records could be incomplete if privileged users bypass the protections or stock changes occur outside the audited mechanism.
+- **What would make me revisit this:** A requirement for stronger human identity attribution, tamper-resistant auditing, or centralized audit collection beyond the current database-level protections.
+
+## What this survives
+
+The implementation was tested to confirm that stock updates generate audit records and that ordinary updates and deletes against the inventory log are rejected.
+
+The order-placement function was also tested to confirm that successful purchases produce corresponding inventory audit records.
+
+The implementation does not reconstruct missing historical metadata or guarantee that privileged database administrators cannot bypass the protections.

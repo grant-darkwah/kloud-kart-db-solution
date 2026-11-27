@@ -1,0 +1,38 @@
+# ADR-002: Use recorded order totals for customer spending reports
+
+- **Status:** Accepted
+- **Date:** 2026-11-27
+- **Decision owner:** Grant Sarfo Darkwah
+
+## Context
+
+Kloud Kart requires a customer spending report to support Monday business reviews.
+
+During data diagnosis, the investigation identified 2,279 orders with mismatches between their recorded order totals and the sums of their order-item values.
+
+Using item-level calculations without resolving these inconsistencies could produce spending figures that differ from the amounts recorded against the orders.
+
+## Decision
+
+Use `orders.total_amount` as the source of customer spending values rather than recalculating order totals from `order_items`.
+
+The report also normalizes order statuses, includes `complete` and `completed` orders, and excludes future orders.
+
+## Alternatives considered
+
+### Alternative A: Calculate spending from order items
+
+- **How it would work:** Sum the individual order-item amounts for each order and aggregate those values by customer.
+- **Why it is attractive:** It derives spending directly from the underlying order lines and allows item-level analysis.
+- **Why rejected:** Existing discrepancies between order totals and item-level sums would produce customer spending figures that may not agree with the amounts recorded in the orders table.
+
+## Consequences
+
+- **What this buys:** A consistent reporting basis using the amounts already recorded against orders, avoiding silent recalculation of historical transaction values.
+- **What this costs:** The report inherits any inaccuracies present in `orders.total_amount` and does not independently reconcile item-level discrepancies.
+- **What it costs the client if I am wrong:** Customer spending figures could be inaccurate if recorded order totals are incorrect or do not represent the business's agreed definition of spending.
+- **What would make me revisit this:** A completed reconciliation of the mismatched orders or a formal business decision to define customer spending using item-level values instead.
+
+## What this survives
+
+The reporting implementation was tested using the existing dataset and uses a consistent order-level spending field. The diagnosis identified 2,279 orders with discrepancies between recorded order totals and item-level sums, which remain a documented data-quality limitation rather than being silently corrected by the report.
